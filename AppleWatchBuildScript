@@ -1,0 +1,143 @@
+#!/bin/bash
+#@author wanyukang 2015
+
+#===========================================
+#init
+workspaceName='*.xcworkspace'
+appName=$(basename ./*.xcworkspace)
+appName=$(echo $appName | awk -F. '{print $1}')
+bundleShortVersion=$(/usr/libexec/PlistBuddy -c "print CFBundleShortVersionString"  "${appName}/Supporting Files/${appName}-Info.plist")
+filepath=$WORKSPACE/$appName.xcodeproj/project.pbxproj
+CodeSignIdentity=\"yourCodeSignIdentity\"
+provisioningProfileDir=yourProvisioningProfileDir
+
+DevAppProfileName=youDevAppProfileName
+DevAppleWatchKitAppProfileName=yourDevAppleWatchKitAppProfileName
+DevAppleWatchKitExtensionProfileName=yourDevAppleWatchKitExtensionProfileName
+DebugBuildConfigurationsId=yourDebugBuildConfigurationsId
+DebugWatchKitExtensionBuildConfigurationsId=yourDebugWatchKitExtensionBuildConfigurationsId
+DebugWatchKitAppBuildConfigurationsId=yourDebugWatchKitAppBuildConfigurationsId
+
+AdcAppProfileName=youAdcAppProfileName
+AdcAppleWatchKitAppProfileName=yourAdcAppleWatchKitAppProfileName
+AdcAppleWatchKitExtensionProfileName=yourAdcAppleWatchKitExtensionProfileName
+ReleaseBuildConfigurationsId=yourReleaseBuildConfigurationsId
+ReleaseWatchKitExtensionBuildConfigurationsId=yourReleaseWatchKitExtensionBuildConfigurationsId
+ReleaseWatchKitAppBuildConfigurationsId=yourReleaseWatchKitAppBuildConfigurationsId
+
+#============================================
+#clean
+xctool -workspace $workspaceName -scheme $appName clean
+rm -rf ${appName}.xcarchive
+rm -rf $WORKSPACE/${appName}.ipa
+rm -rf $WORKSPACE/devProfiles
+rm -rf $WORKSPACE/adcProfiles
+
+#============================================
+#unlock
+security unlock-keychain -p yourSecurityPassword
+
+#============================================
+#function replace
+replaceValue(){
+    orgin=$(grep -i -n $1 $filepath | head -n 1 | awk -F ':' '{print $1}')
+	count=$(grep -i -A 200 $1 $filepath | grep -i -n $3 | head -n 1 |awk -F ':' '{print $1}')
+	let line=$orgin+count-1
+	echo $line
+	sed -i '' $line"s/^.*/$2/g" $filepath
+}
+
+#============================================
+#update profiles
+updateProfiles(){
+	#download
+    profileName=$2
+    if [ "$1" = "dev" ];then
+    	ios profiles:download $profileName
+    fi
+    if [ "$1" != "dev" ];then
+    	ios profiles:download --type distribution $profileName
+    fi
+    #update
+	profileName=$profileName".mobileprovision"
+	mv -f $WORKSPACE/$profileName $provisioningProfileDir
+}
+
+#============================================
+#ENV dev
+
+if [ "$1" = "dev" ];then
+configuration="Debug"
+
+#Update profiles
+updateProfiles $1 $DevAppProfileName
+updateProfiles $1 $DevAppleWatchKitAppProfileName
+updateProfiles $1 $DevAppleWatchKitExtensionProfileName
+
+#preread provisioning profile list
+ios profiles:list >> devProfiles
+fileDevProfiles=$WORKSPACE/devProfiles
+
+#get uuid
+AppProvisioningProfile=\"$(grep -i -n $DevAppProfileName $fileDevProfiles | awk -F '|' '{print $4}'| awk 'gsub(/^ *| *$/,"")' | head -n 1)\"
+WatchKitExtensionProvisioningProfile=\"$(grep -i -n $DevAppleWatchKitExtensionProfileName $fileDevProfiles | awk -F '|' '{print $4}'| awk 'gsub(/^ *| *$/,"")' | head -n 1)\"
+WatchKitAppProvisioningProfile=\"$(grep -i -n $DevAppleWatchKitAppProfileName $fileDevProfiles | awk -F '|' '{print $4}'| awk 'gsub(/^ *| *$/,"")' | head -n 1)\"
+
+#buildConfigurations ID
+AppBuildConfigurationsId=$DebugBuildConfigurationsId
+WatchKitExtensionBuildConfigurationsId=$DebugWatchKitExtensionBuildConfigurationsId
+WatchKitAppBuildConfigurationsId=$DebugWatchKitAppBuildConfigurationsId
+fi
+
+#============================================
+#ENV release
+
+if [ "$1" = "release" ];then
+configuration="Release"
+
+#Update profiles
+updateProfiles $1 $AdcAppProfileName
+updateProfiles $1 $AdcAppleWatchKitAppProfileName
+updateProfiles $1 $AdcAppleWatchKitExtensionProfileName
+
+#preread provisioning profile list
+ios profiles --type distribution >> adcProfiles
+fileAdcProfiles=$WORKSPACE/adcProfiles
+
+#get uuid
+AppProvisioningProfile=\"$(grep -i -n $AdcAppProfileName $fileAdcProfiles | awk -F '|' '{print $4}'| awk 'gsub(/^ *| *$/,"")' | head -n 1)\"
+WatchKitExtensionProvisioningProfile=\"$(grep -i -n $AdcAppleWatchKitExtensionProfileName $fileAdcProfiles | awk -F '|' '{print $4}'| awk 'gsub(/^ *| *$/,"")' | head -n 1)\"
+WatchKitAppProvisioningProfile=\"$(grep -i -n $AdcAppleWatchKitAppProfileName $fileAdcProfiles | awk -F '|' '{print $4}'| awk 'gsub(/^ *| *$/,"")' | head -n 1)\"
+
+#buildConfigurations ID
+AppBuildConfigurationsId=$ReleaseBuildConfigurationsId
+WatchKitExtensionBuildConfigurationsId=$ReleaseWatchKitExtensionBuildConfigurationsId
+WatchKitAppBuildConfigurationsId=$ReleaseWatchKitAppBuildConfigurationsId
+fi
+
+#============================================
+#replace XCConfigurationList
+
+#replace PROVISIONING_PROFILE
+replaceValue "^.*${AppBuildConfigurationsId}.*=" "				PROVISIONING_PROFILE = ${AppProvisioningProfile};" "PROVISIONING_PROFILE"
+replaceValue "^.*${WatchKitExtensionBuildConfigurationsId}.*=" "				PROVISIONING_PROFILE = ${WatchKitExtensionProvisioningProfile};" "PROVISIONING_PROFILE"
+replaceValue "^.*${WatchKitAppBuildConfigurationsId}.*=" "				PROVISIONING_PROFILE = ${WatchKitAppProvisioningProfile};" "PROVISIONING_PROFILE"
+
+#replace CODE_SIGN_IDENTITY
+replaceValue "^.*${AppBuildConfigurationsId}.*=" "				CODE_SIGN_IDENTITY = ${CodeSignIdentity};" "CODE_SIGN_IDENTITY"
+replaceValue "^.*${WatchKitExtensionBuildConfigurationsId}.*=" "				CODE_SIGN_IDENTITY = ${CodeSignIdentity};" "CODE_SIGN_IDENTITY"
+replaceValue "^.*${WatchKitAppBuildConfigurationsId}.*=" "				CODE_SIGN_IDENTITY = ${CodeSignIdentity};" "CODE_SIGN_IDENTITY"
+
+#replace CODE_SIGN_IDENTITY[sdk]
+replaceValue "^.*${AppBuildConfigurationsId}.*=" "				\"CODE_SIGN_IDENTITY[sdk=os*]\" = ${CodeSignIdentity};" "CODE_SIGN_IDENTITY\[sdk=os\*\]"
+replaceValue "^.*${WatchKitExtensionBuildConfigurationsId}.*=" "				\"CODE_SIGN_IDENTITY[sdk=os*]\" = ${CodeSignIdentity};" "CODE_SIGN_IDENTITY\[sdk=os\*\]"
+replaceValue "^.*${WatchKitAppBuildConfigurationsId}.*=" "				\"CODE_SIGN_IDENTITY[sdk=os*]\" = ${CodeSignIdentity};" "CODE_SIGN_IDENTITY\[sdk=os\*\]"
+
+#============================================
+#archive 
+xctool -configuration $configuration -sdk os -workspace $workspaceName -scheme $appName archive -archivePath $WORKSPACE/${appName}
+
+#============================================
+#app to ipa
+xcrun -sdk os PackageApplication -v $WORKSPACE/${appName}.xcarchive/Products/Applications/${appName}.app -o $WORKSPACE/${appName}.ipa
+
