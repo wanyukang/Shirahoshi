@@ -135,9 +135,9 @@ replaceValue "^.*${WatchKitAppBuildConfigurationsId}.*=" "				\"CODE_SIGN_IDENTI
 
 #============================================
 #archive 
-xctool -configuration $configuration -sdk os -workspace $workspaceName -scheme $appName archive -archivePath $WORKSPACE/${appName}
+xctool -configuration $configuration -sdk iphoneos -workspace $workspaceName -scheme $appName archive -archivePath $WORKSPACE/${appName}
 
 #============================================
 #app to ipa
-xcrun -sdk os PackageApplication -v $WORKSPACE/${appName}.xcarchive/Products/Applications/${appName}.app -o $WORKSPACE/${appName}.ipa
+xcrun -sdk iphoneos PackageApplication -v $WORKSPACE/${appName}.xcarchive/Products/Applications/${appName}.app -o $WORKSPACE/${appName}.ipa
 
