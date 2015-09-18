@@ -17,3 +17,6 @@ This script is by receiving a parameter to distinguish which configuration would
 ~~~
 
 It means that you have to add your own configuration items in the script.
+
+##LICENSE
+MIT

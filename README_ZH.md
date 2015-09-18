@@ -30,3 +30,6 @@
 [kkbox-ios-jenkins](https://kkbox.codes/archives/2015/07/03/kkbox-ios-jenkins/)
 
 [project.pbxproj，最熟悉的”陌生人”](http://www.olinone.com/?p=215)
+
+##LICENSE
+MIT
